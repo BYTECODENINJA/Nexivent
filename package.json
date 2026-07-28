@@ -79,7 +79,7 @@
     ],
     "moduleNameMapper": {
       "^@app/common(|/.*)$": "<rootDir>/libs/common/src/$1",
-      "^@app/databse(|/.*)$": "<rootDir>/libs/databse/src/$1",
+      "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@app/kafka(|/.*)$": "<rootDir>/libs/kafka/src/$1"
     }
   }

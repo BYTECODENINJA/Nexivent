@@ -37,13 +37,13 @@
         "tsConfigPath": "libs/common/tsconfig.lib.json"
       }
     },
-    "databse": {
+    "database": {
       "type": "library",
-      "root": "libs/databse",
+      "root": "libs/database",
       "entryFile": "index",
-      "sourceRoot": "libs/databse/src",
+      "sourceRoot": "libs/database/src",
       "compilerOptions": {
-        "tsConfigPath": "libs/databse/tsconfig.lib.json"
+        "tsConfigPath": "libs/database/tsconfig.lib.json"
       }
     },
     "kafka": {

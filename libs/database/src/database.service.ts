@@ -4,7 +4,7 @@ import {Pool} from "pg";
 import * as schema from './schema';
 
 @Injectable()
-export class DatabseService implements OnModuleDestroy{
+export class DatabaseService implements OnModuleDestroy{
     private pool: Pool;
     public db: NodePgDatabase<typeof schema>
 

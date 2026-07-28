@@ -28,11 +28,11 @@
       "@app/common/*": [
         "libs/common/src/*"
       ],
-      "@app/databse": [
-        "libs/databse/src"
+      "@app/database": [
+        "libs/database/src"
       ],
-      "@app/databse/*": [
-        "libs/databse/src/*"
+      "@app/database/*": [
+        "libs/database/src/*"
       ],
       "@app/kafka": [
         "libs/kafka/src"
