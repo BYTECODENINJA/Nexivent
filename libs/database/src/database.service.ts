@@ -9,7 +9,7 @@ export class DatabaseService implements OnModuleDestroy{
     public db: NodePgDatabase<typeof schema>
 
     constructor() {
-        const connectionString = process.env.DATABASE_URL!;
+        const connectionString = 'postgresql://nexivent:nexivent_password@localhost:5432/nexivent?schema=public';
 
         this.pool = new Pool({ connectionString });
         this.db = drizzle(this.pool, { schema });

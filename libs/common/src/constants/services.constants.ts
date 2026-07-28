@@ -10,7 +10,7 @@ export const services = {
 
 export const SERVICES_PORTS = {
     API_GATEWAY: 3000,
-    AUTHE: 3001,
+    AUTH: 3001,
     USERS_SERVICE: 3002,
     EVENTS_SERVICE: 3003,
     TICKETS_SERVICE: 3004,
