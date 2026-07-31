@@ -18,6 +18,11 @@ export class KafkaModule {
               client: {
                 clientId: KAFKA_CLIENT_ID,
                 brokers: [KAFKA_BROKER],
+                retry: {
+                  retries: 5,
+                  initialRetryTime: 300,
+                  factor: 2,
+                },
               },
               consumer: {
                 groupId: consumerGroup ?? KAFKA_CONSUMER_GROUP,

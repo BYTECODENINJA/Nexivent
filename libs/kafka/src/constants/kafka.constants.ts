@@ -1,5 +1,5 @@
 export const KAFKA_BROKER = process.env.KAFKA_BROKER ?? 'localhost:9093';
-export const KAFKA_CLIENT_ID ='nexivent';
+export const KAFKA_CLIENT_ID ='nexivent-client';
 export const KAFKA_CONSUMER_GROUP = 'nexivent-consumer';
 
 //Kafka Topics
@@ -12,6 +12,7 @@ export const KAFKA_TOPICS = {
     //EVENTS
     EVENT_CREATED: 'event.created',
     EVENT_UPDATED: 'event.updated',
+    EVENT_PUBLISHED: 'event.published',
     EVENT_CANCELLED: 'event.cancelled',
 
     //Ticket events

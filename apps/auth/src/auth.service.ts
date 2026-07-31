@@ -16,7 +16,11 @@ export class AuthService implements OnModuleInit {
  }
 
  async onModuleInit() {
-  await this.kafkaClient.connect();
+  try {
+   await this.kafkaClient.connect();
+  } catch (error) {
+   console.error('Failed to connect to Kafka in AuthService:', error.message);
+  }
  }
 
  async register(email: string, password: string, name: string){

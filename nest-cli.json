@@ -46,6 +46,15 @@
         "tsConfigPath": "libs/database/tsconfig.lib.json"
       }
     },
+    "events": {
+      "type": "application",
+      "root": "apps/events",
+      "entryFile": "main",
+      "sourceRoot": "apps/events/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/events/tsconfig.app.json"
+      }
+    },
     "kafka": {
       "type": "library",
       "root": "libs/kafka",
