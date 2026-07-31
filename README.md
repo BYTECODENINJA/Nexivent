@@ -11,36 +11,121 @@ A high-performance event management system built with a microservices architectu
 * **DevOps**: [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
 * **Mailing**: [MailHog](https://github.com/mailhog/MailHog) (Development)
 
-### Quick Start
+### 🚀 Monorepo Local Setup
 
-#### Requirements
-* Node.js (v20 or higher)
-* Docker & Docker Compose
-* npm or yarn
+#### 1. Prerequisites
+* **Node.js**: >= 22.x
+* **Container Runtime**: Docker & Docker Compose
 
-#### Installation
+#### 2. Infrastructure Up-Time
+Boot up localized instances of PostgreSQL, Apache Kafka, Redis, and MailHog:
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd nexivent
-
-# Install dependencies
-npm install
-```
-
-#### Run Scripts
-```bash
-# Start infrastructure (Kafka, PostgreSQL, Redis, MailHog)
 docker-compose up -d
-
-# Run migrations (using drizzle-kit)
-npm run drizzle-kit push
-
-# Start all microservices in development mode
-npm run start:dev
 ```
 
-### Architecture Map
+#### 3. Workspace Provisioning
+```bash
+# Install root and workspace dependencies securely
+npm clean-install
+
+# Seed environmental templates
+cp .env.example .env
+```
+
+#### 4. Database Schema Generation & Migration
+Generate and execute type-safe SQL statements using Drizzle-Kit:
+```bash
+# Generate SQL migrations based on TypeScript schemas
+npx drizzle-kit generate
+
+# Apply migrations directly to the local PostgreSQL instance
+npx drizzle-kit migrate
+```
+
+#### 5. Launch Targeted Microservice Applications
+Boot services using targeted NestJS CLI workspace parameters:
+```bash
+# Boot all services concurrently
+npm run start:dev
+
+# Boot individual applications
+npm run start:dev api-gateway
+npm run start:dev auth
+npm run start:dev events
+npm run start:dev tickets
+npm run start:dev notifications
+```
+
+### 🏗️ Monorepo Architecture & Visuals
+
+#### Workspace Structure
+```mermaid
+graph TD
+    subgraph Monorepo Workspace [Apps & Shared Libs]
+        GatewayApp[apps/api-gateway]
+        AuthApp[apps/auth]
+        EventsApp[apps/events]
+        TicketsApp[apps/tickets]
+        NotifyApp[apps/notifications]
+        SharedDb[libs/database]
+        SharedKafka[libs/kafka]
+        SharedCommon[libs/common]
+    end
+
+    SharedDb -->|Drizzle Schema Provider| AuthApp
+    SharedDb -->|Drizzle Schema Provider| EventsApp
+    SharedDb -->|Drizzle Schema Provider| TicketsApp
+    
+    SharedKafka -->|Kafka Client/Consumer| AuthApp
+    SharedKafka -->|Kafka Client/Consumer| EventsApp
+    SharedKafka -->|Kafka Client/Consumer| TicketsApp
+    SharedKafka -->|Kafka Client/Consumer| NotifyApp
+    
+    SharedCommon -->|Constants/DTOs/Utils| GatewayApp
+    SharedCommon -->|Constants/DTOs/Utils| AuthApp
+    SharedCommon -->|Constants/DTOs/Utils| EventsApp
+    SharedCommon -->|Constants/DTOs/Utils| TicketsApp
+    SharedCommon -->|Constants/DTOs/Utils| NotifyApp
+
+    GatewayApp -->|Internal Proxy| AuthApp
+    GatewayApp -->|Internal Proxy| EventsApp
+    GatewayApp -->|Internal Proxy| TicketsApp
+```
+
+#### Event & Context Boundaries
+```mermaid
+graph LR
+    Client([Client HTTP]) --> GatewayApp[API Gateway]
+    
+    subgraph Microservices
+        AuthApp[Auth Service]
+        EventsApp[Events Service]
+        TicketsApp[Tickets Service]
+        NotifyApp[Notifications Service]
+    end
+
+    subgraph Data Stores
+        Postgres[(PostgreSQL)]
+        Redis[(Redis Caching)]
+    end
+
+    GatewayApp --> AuthApp
+    GatewayApp --> EventsApp
+    GatewayApp --> TicketsApp
+
+    AuthApp -.->|Emit: user.registered| KafkaBroker{{Kafka Broker}}
+    EventsApp -.->|Emit: event.*| KafkaBroker
+    TicketsApp -.->|Emit: ticket.*| KafkaBroker
+    
+    KafkaBroker -.->|Consume| NotifyApp
+    
+    AuthApp <--> Postgres
+    EventsApp <--> Postgres
+    TicketsApp <--> Postgres
+    NotifyApp --> MailHog[MailHog SMTP]
+```
+
+### 📂 Architecture Map
 ```text
 📂 nexivent/
 ├── 📁 apps/
@@ -67,5 +152,3 @@ npm run start:dev
 | `SMTP_PORT` | Number | SMTP server port for notifications | No | `1025` |
 | `DATABASE_URL` | String | Postgres connection string | **Yes** | N/A |
 
----
-*Generated using the Project Documenter skill.*
