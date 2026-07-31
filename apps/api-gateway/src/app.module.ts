@@ -6,6 +6,7 @@ import { EventsModule } from './events/events.module';
 import {PassportModule} from "@nestjs/passport";
 import {JwtModule} from "@nestjs/jwt";
 import {JwtStrategy} from "../../auth/src/jwt.strategy";
+import {TicketsModule} from "./tickets/ticket.module";
 
 @Module({
   imports: [
@@ -14,7 +15,8 @@ import {JwtStrategy} from "../../auth/src/jwt.strategy";
         secret: process.env.JWT_SECRET || 'secret',
       }),
       AuthModule,
-      EventsModule
+      EventsModule,
+      TicketsModule
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy],
