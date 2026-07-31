@@ -12,19 +12,19 @@ import { CheckInTicketDto, PurchaseTicketDto } from '@app/common';
 
 @Controller()
 export class TicketsController {
-  constructor(private readonly ticketsServiceService: TicketsService) {}
+  constructor(private readonly ticketsService: TicketsService) {}
 
   @Post('purchase')
   purchase(
       @Body() purchaseDto: PurchaseTicketDto,
       @Headers('x-user-id') userId: string,
   ) {
-    return this.ticketsServiceService.purchase(purchaseDto, userId);
+    return this.ticketsService.purchase(purchaseDto, userId);
   }
 
   @Get('my-tickets')
   findMyTickets(@Headers('x-user-id') userId: string) {
-    return this.ticketsServiceService.findMyTicket(userId);
+    return this.ticketsService.findMyTicket(userId);
   }
 
   @Get(':id')
@@ -32,7 +32,7 @@ export class TicketsController {
       @Param('id', ParseUUIDPipe) id: string,
       @Headers('x-user-id') userId: string,
   ) {
-    return this.ticketsServiceService.findOne(id, userId);
+    return this.ticketsService.findOne(id, userId);
   }
 
   @Post(':id/cancel')
@@ -40,7 +40,7 @@ export class TicketsController {
       @Param('id', ParseUUIDPipe) id: string,
       @Headers('x-user-id') userId: string,
   ) {
-    return this.ticketsServiceService.cancel(id, userId);
+    return this.ticketsService.cancel(id, userId);
   }
 
   @Post('check-in')
@@ -48,7 +48,7 @@ export class TicketsController {
       @Body() checkInDto: CheckInTicketDto,
       @Headers('x-user-id') organizerId: string,
   ) {
-    return this.ticketsServiceService.checkIn(
+    return this.ticketsService.checkIn(
         checkInDto.ticketCode,
         organizerId,
     );
@@ -59,6 +59,6 @@ export class TicketsController {
       @Param('eventId', ParseUUIDPipe) eventId: string,
       @Headers('x-user-id') organizerId: string,
   ) {
-    return this.ticketsServiceService.findEventTicket(eventId, organizerId);
+    return this.ticketsService.findEventTicket(eventId, organizerId);
   }
 }
