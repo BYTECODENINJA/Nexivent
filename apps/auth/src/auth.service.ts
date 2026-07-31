@@ -52,7 +52,7 @@ export class AuthService implements OnModuleInit {
    timestamp: new Date().toISOString()
   });
 
-  return { message: 'Use has been successfully registered', userId: user.id}
+  return { message: 'User registered successfully', userId: user.id}
  }
 
  async login(email: string, password: string){
