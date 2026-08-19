@@ -1,154 +1,386 @@
-# NexiVent: Scalable Event & Ticket Management Microservices
+# NexiVent
 
-A high-performance event management system built with a microservices architecture for handling authentication, event creation, ticket sales, and automated notifications.
+## 1. Project Overview
 
-### Tech Stack
-* **Framework**: [NestJS](https://nestjs.com/) (Node.js)
-* **Database**: [PostgreSQL](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
-* **Messaging**: [Apache Kafka](https://kafka.apache.org/)
-* **Caching**: [Redis](https://redis.io/)
-* **Language**: [TypeScript](https://www.typescriptlang.org/)
-* **DevOps**: [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/)
-* **Mailing**: [MailHog](https://github.com/mailhog/MailHog) (Development)
+![Project Diagram](project.png)
 
-### 🚀 Monorepo Local Setup
 
-#### 1. Prerequisites
-* **Node.js**: >= 22.x
-* **Container Runtime**: Docker & Docker Compose
+NexiVent is a TypeScript/NestJS event-management backend organized as a microservice monorepo. It supports account registration and login, event creation and publication, ticket purchase and check-in, and asynchronous email notifications. The API gateway is the client-facing entry point; it forwards HTTP requests to dedicated Auth, Events, and Tickets services.
 
-#### 2. Infrastructure Up-Time
-Boot up localized instances of PostgreSQL, Apache Kafka, Redis, and MailHog:
-```bash
-docker-compose up -d
-```
+Key architectural characteristics:
 
-#### 3. Workspace Provisioning
-```bash
-# Install root and workspace dependencies securely
-npm clean-install
+- **Service separation:** Auth, Events, Tickets, Notifications, and the API Gateway are independently bootstrapped NestJS applications.
+- **Shared infrastructure libraries:** Common DTOs, Drizzle database schemas, and Kafka client configuration live in reusable libraries.
+- **Event-driven notifications:** Domain services emit Kafka events; Notifications consumes registration and ticket events and sends email through SMTP.
+- **Validation and authorization:** HTTP applications use Nest's global `ValidationPipe`; JWT Bearer authentication guards gateway routes that require an authenticated user.
 
-# Seed environmental templates
-cp .env.example .env
-```
+## 2. Tech Stack
 
-#### 4. Database Schema Generation & Migration
-Generate and execute type-safe SQL statements using Drizzle-Kit:
-```bash
-# Generate SQL migrations based on TypeScript schemas
-npx drizzle-kit generate
+| Area | Technology |
+| --- | --- |
+| Language | TypeScript (target: ES2023) |
+| Runtime | Node.js |
+| Framework | NestJS 11 |
+| API style | REST over HTTP |
+| Database | PostgreSQL 16 (local Docker service) |
+| ORM / schema | Drizzle ORM and Drizzle Kit |
+| Message broker | Apache Kafka (KafkaJS / Nest microservices) |
+| Authentication | Passport JWT, `@nestjs/jwt`, and bcrypt |
+| Email | Nodemailer; MailHog is provided for local SMTP testing |
+| HTTP client | Axios through `@nestjs/axios` |
+| Validation | class-validator and class-transformer |
+| Testing | Jest, ts-jest, and Supertest |
+| Code quality | ESLint and Prettier |
+| Local infrastructure | Docker Compose |
 
-# Apply migrations directly to the local PostgreSQL instance
-npx drizzle-kit migrate
-```
+Redis is included in `docker-compose.yaml`, but no application code currently uses it.
 
-#### 5. Launch Targeted Microservice Applications
-Boot services using targeted NestJS CLI workspace parameters:
-```bash
-# Boot all services concurrently
-npm run start:dev
+## 3. Architecture & Flow (Mermaid Diagrams)
 
-# Boot individual applications
-npm run start:dev api-gateway
-npm run start:dev auth
-npm run start:dev events
-npm run start:dev tickets
-npm run start:dev notifications
-```
+### System Architecture
 
-### 🏗️ Monorepo Architecture & Visuals
-
-#### Workspace Structure
 ```mermaid
-graph TD
-    subgraph Monorepo Workspace [Apps & Shared Libs]
-        GatewayApp[apps/api-gateway]
-        AuthApp[apps/auth]
-        EventsApp[apps/events]
-        TicketsApp[apps/tickets]
-        NotifyApp[apps/notifications]
-        SharedDb[libs/database]
-        SharedKafka[libs/kafka]
-        SharedCommon[libs/common]
-    end
+flowchart LR
+    Client[HTTP client] --> Gateway[API Gateway :3000]
 
-    SharedDb -->|Drizzle Schema Provider| AuthApp
-    SharedDb -->|Drizzle Schema Provider| EventsApp
-    SharedDb -->|Drizzle Schema Provider| TicketsApp
-    
-    SharedKafka -->|Kafka Client/Consumer| AuthApp
-    SharedKafka -->|Kafka Client/Consumer| EventsApp
-    SharedKafka -->|Kafka Client/Consumer| TicketsApp
-    SharedKafka -->|Kafka Client/Consumer| NotifyApp
-    
-    SharedCommon -->|Constants/DTOs/Utils| GatewayApp
-    SharedCommon -->|Constants/DTOs/Utils| AuthApp
-    SharedCommon -->|Constants/DTOs/Utils| EventsApp
-    SharedCommon -->|Constants/DTOs/Utils| TicketsApp
-    SharedCommon -->|Constants/DTOs/Utils| NotifyApp
+    Gateway --> Auth[Auth service :3001]
+    Gateway --> Events[Events service :3003]
+    Gateway --> Tickets[Tickets service :3004]
 
-    GatewayApp -->|Internal Proxy| AuthApp
-    GatewayApp -->|Internal Proxy| EventsApp
-    GatewayApp -->|Internal Proxy| TicketsApp
+    Auth --> PostgreSQL[(PostgreSQL)]
+    Events --> PostgreSQL
+    Tickets --> PostgreSQL
+
+    Auth --> Kafka[(Kafka)]
+    Events --> Kafka
+    Tickets --> Kafka
+    Kafka --> Notifications[Notifications service :3006]
+    Notifications --> SMTP[SMTP / MailHog]
+
+    Redis[(Redis)]
+    KafkaUI[Kafka UI :8080] --> Kafka
 ```
 
-#### Event & Context Boundaries
+### Core Flow: Ticket Purchase
+
 ```mermaid
-graph LR
-    Client([Client HTTP]) --> GatewayApp[API Gateway]
-    
-    subgraph Microservices
-        AuthApp[Auth Service]
-        EventsApp[Events Service]
-        TicketsApp[Tickets Service]
-        NotifyApp[Notifications Service]
-    end
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway
+    participant T as Tickets Service
+    participant DB as PostgreSQL
+    participant K as Kafka
+    participant N as Notifications Service
+    participant M as SMTP / MailHog
 
-    subgraph Data Stores
-        Postgres[(PostgreSQL)]
-        Redis[(Redis Caching)]
-    end
-
-    GatewayApp --> AuthApp
-    GatewayApp --> EventsApp
-    GatewayApp --> TicketsApp
-
-    AuthApp -.->|Emit: user.registered| KafkaBroker{{Kafka Broker}}
-    EventsApp -.->|Emit: event.*| KafkaBroker
-    TicketsApp -.->|Emit: ticket.*| KafkaBroker
-    
-    KafkaBroker -.->|Consume| NotifyApp
-    
-    AuthApp <--> Postgres
-    EventsApp <--> Postgres
-    TicketsApp <--> Postgres
-    NotifyApp --> MailHog[MailHog SMTP]
+    C->>G: POST /tickets/purchase with Bearer token
+    G->>G: Validate JWT and extract userId
+    G->>T: POST /purchase with x-user-id
+    T->>DB: Read event and confirmed-ticket total
+    DB-->>T: Event and capacity data
+    T->>T: Validate published status and capacity
+    T->>DB: Insert confirmed ticket
+    DB-->>T: Created ticket
+    T->>K: Emit ticket.purchased
+    T-->>G: Purchase result
+    G-->>C: 201 response
+    K-->>N: ticket.purchased event
+    N->>M: Send confirmation email
 ```
 
-### 📂 Architecture Map
+## 4. Project Structure
+
 ```text
-📂 nexivent/
-├── 📁 apps/
-│   ├── 📁 api-gateway/     # Entry point for client requests, routes to microservices
-│   ├── 📁 auth/            # Identity management, JWT issuance, and validation
-│   ├── 📁 events/          # Event lifecycle management (Create, Update, List)
-│   ├── 📁 notifications/   # Email dispatching via Kafka consumers
-│   └── 📁 tickets/         # Ticket issuance and reservation logic
-├── 📁 libs/
-│   ├── 📁 common/          # Shared DTOs, interfaces, constants, and utils
-│   ├── 📁 database/        # Drizzle ORM schema definitions and database service
-│   └── 📁 kafka/           # Shared Kafka client registration and message patterns
-├── 📄 docker-compose.yaml  # Infrastructure definition for local development
-└── 📄 drizzle.config.ts    # Drizzle ORM configuration
+nexivent/
+├── apps/
+│   ├── api-gateway/        # Public HTTP gateway that proxies auth, event, and ticket requests.
+│   ├── auth/               # User registration, login, JWT issuance, and profile lookup.
+│   ├── events/             # Event persistence, publication, cancellation, and ownership checks.
+│   ├── notifications/      # Kafka event consumers and SMTP email delivery.
+│   └── tickets/            # Ticket purchase, cancellation, check-in, and ticket queries.
+├── libs/
+│   ├── common/             # Shared DTOs, interfaces, constants, and utilities.
+│   ├── database/           # Drizzle PostgreSQL schemas and the shared database service.
+│   └── kafka/              # Kafka topics, client token, and dynamic Nest Kafka module.
+├── dist/                   # Compiled application output (generated).
+├── docker-compose.yaml     # Local Kafka, Kafka UI, PostgreSQL, Redis, and MailHog services.
+├── drizzle.config.ts       # Drizzle Kit schema, migrations, and connection configuration.
+├── nest-cli.json           # Nest monorepo application and library definitions.
+├── package.json            # Scripts, runtime dependencies, development tools, and Jest config.
+├── pnpm-lock.yaml          # Locked dependency graph for pnpm.
+└── tsconfig.json           # Shared TypeScript compiler and path-alias configuration.
 ```
 
-### Environment Variables
+## 5. Core Functions & API Endpoints
 
-| Variable | Type | Description | Required | Default |
-| :--- | :--- | :--- | :--- | :--- |
-| `KAFKA_BROKER` | String | List of Kafka broker addresses | No | `localhost:9093` |
-| `JWT_SECRET` | String | Secret key for signing JWT tokens | No | `secret` |
-| `SMTP_HOST` | String | SMTP server host for notifications | No | `localhost` |
-| `SMTP_PORT` | Number | SMTP server port for notifications | No | `1025` |
-| `DATABASE_URL` | String | Postgres connection string | **Yes** | N/A |
+### API Endpoints
 
+The following routes are exposed by the API Gateway at `http://localhost:3000`. Routes marked **Authenticated** require an `Authorization: Bearer <access_token>` header. Gateway controllers forward requests to services over localhost HTTP; service ports are listed in the architecture diagram.
+
+#### Gateway and authentication
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/` | Returns the API Gateway status string. |
+| `POST` | `/auth/register` | Creates a user account. |
+| `POST` | `/auth/login` | Validates credentials and returns a JWT access token. |
+| `GET` | `/auth/profile` | Returns the authenticated user's profile. |
+
+`POST /auth/register`
+
+```json
+{
+  "email": "ada@example.com",
+  "password": "secure-password",
+  "name": "Ada Lovelace"
+}
+```
+
+```json
+{
+  "message": "User registered successfully",
+  "userId": "uuid"
+}
+```
+
+`POST /auth/login`
+
+```json
+{
+  "email": "ada@example.com",
+  "password": "secure-password"
+}
+```
+
+```json
+{
+  "access_token": "jwt",
+  "user": {
+    "id": "uuid",
+    "email": "ada@example.com",
+    "name": "Ada Lovelace",
+    "role": "USER"
+  }
+}
+```
+
+`GET /auth/profile` response:
+
+```json
+{
+  "id": "uuid",
+  "email": "ada@example.com",
+  "name": "Ada Lovelace",
+  "role": "USER"
+}
+```
+
+#### Events
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/events` | Lists published events. |
+| `GET` | `/events/my-events` | **Authenticated.** Lists events owned by the current user. |
+| `GET` | `/events/:id` | Fetches an event by UUID. |
+| `POST` | `/events` | **Authenticated.** Creates an event in `DRAFT` status. |
+| `PUT` | `/events/:id/publish` | **Authenticated.** Publishes an event when the caller is its organizer or has the `ADMIN` role. |
+| `PUT` | `/events/:id/cancel` | **Authenticated.** Cancels an event when the caller is its organizer or has the `ADMIN` role. |
+
+`POST /events`
+
+```json
+{
+  "title": "NexiVent Summit",
+  "description": "An event for builders.",
+  "date": "2026-09-15T09:00:00.000Z",
+  "location": "Nairobi",
+  "capacity": 100,
+  "price": 2500
+}
+```
+
+An event response contains the generated UUID, submitted fields, `organizerId`, timestamps, and a `status` of `DRAFT`, `PUBLISHED`, or `CANCELLED`:
+
+```json
+{
+  "id": "uuid",
+  "title": "NexiVent Summit",
+  "date": "2026-09-15T09:00:00.000Z",
+  "location": "Nairobi",
+  "capacity": 100,
+  "price": 2500,
+  "status": "DRAFT",
+  "organizerId": "uuid"
+}
+```
+
+#### Tickets
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/tickets/purchase` | **Authenticated.** Purchases 1–10 tickets for a published event with available capacity. |
+| `GET` | `/tickets/my-tickets` | **Authenticated.** Lists the current user's tickets with event details. |
+| `GET` | `/tickets/:id` | **Authenticated.** Returns one ticket owned by the current user. |
+| `POST` | `/tickets/:id/cancel` | **Authenticated.** Cancels a ticket unless it is already cancelled or checked in. |
+| `POST` | `/tickets/check-in` | **Authenticated.** Checks in a ticket; the caller must own the event. |
+| `GET` | `/tickets/event/:eventId` | **Authenticated.** Lists tickets for an event; the caller must own the event. |
+
+`POST /tickets/purchase`
+
+```json
+{
+  "eventId": "00000000-0000-4000-8000-000000000000",
+  "quantity": 2
+}
+```
+
+```json
+{
+  "message": "Ticket purchased successfully",
+  "ticket": {
+    "id": "uuid",
+    "ticketCode": "A1B2C3D4E5F6",
+    "eventTitle": "NexiVent Summit",
+    "quantity": 2,
+    "totalPrice": 5000,
+    "status": "CONFIRMED",
+    "purchasedAt": "2026-08-19T10:00:00.000Z"
+  }
+}
+```
+
+`POST /tickets/check-in`
+
+```json
+{
+  "ticketCode": "A1B2C3D4E5F6"
+}
+```
+
+```json
+{
+  "message": "Ticket checked in successfully",
+  "ticket": {
+    "id": "uuid",
+    "ticketCode": "A1B2C3D4E5F6",
+    "quantity": 2,
+    "status": "CHECKED_IN",
+    "checkedInAt": "2026-08-19T10:30:00.000Z"
+  }
+}
+```
+
+#### Notifications service
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `http://localhost:3006/health` | Returns the Notifications service health payload. |
+
+### Internal Functions and Services
+
+| Component | Responsibilities and interactions |
+| --- | --- |
+| `AuthService.register(email, password, name)` | Checks `users` for an existing email, bcrypt-hashes the password, inserts the user, then emits `user.registered` to Kafka. Returns a success message and user ID. |
+| `AuthService.login(email, password)` | Retrieves a user by email, verifies the bcrypt hash, signs a one-hour JWT containing `sub` and `email`, and emits `user.login`. Returns the access token and selected user data. |
+| `EventsService.create(...)` | Inserts a `DRAFT` event associated with the supplied organizer ID and emits `event.created`. |
+| `EventsService.update/publish/cancel(...)` | Loads the event, permits only its organizer or an `ADMIN`, updates the event record, and emits the matching Kafka event. The implementation contains update logic, but the API Gateway does not currently expose an event-update route. |
+| `TicketsService.purchase(...)` | Verifies that the event exists and is published, aggregates confirmed quantities to enforce capacity, inserts a confirmed ticket with a random 12-character hexadecimal code, and emits `ticket.purchased`. Prices are stored and returned as integers. |
+| `TicketsService.cancel/checkIn(...)` | Enforces ticket ownership for cancellation and event-organizer ownership for check-in, updates ticket status and timestamps, and emits ticket lifecycle events. |
+| `NotificationsService` and `EmailService` | Consume `user.registered`, `ticket.purchased`, and `ticket.cancelled`; build HTML email bodies; and send them through Nodemailer. Ticket notifications use `user@example.com` when their Kafka event lacks an email address. |
+| `DatabaseService` | Creates a `pg` pool and a Drizzle database instance backed by the `users`, `events`, and `tickets` schemas. At runtime its connection string is currently hard-coded rather than read from `DATABASE_URL`. |
+
+## 6. Getting Started (Local Development)
+
+### Prerequisites
+
+- Node.js (the repository does not declare a required version; its TypeScript target is ES2023).
+- pnpm (a `pnpm-lock.yaml` is committed).
+- Docker and Docker Compose.
+
+### Installation
+
+```bash
+git clone <repository-url>
+cd nexivent
+pnpm install --frozen-lockfile
+```
+
+### Environment Setup
+
+The repository contains a `.env` file with the local Drizzle connection string. Create or update it with the following value for local migrations:
+
+```dotenv
+DATABASE_URL=postgresql://nexivent:nexivent_password@localhost:5432/nexivent?schema=public
+```
+
+Optional service settings can be placed in `.env`; see [Environment Variables](#7-environment-variables). Nest's entry points read from `process.env`; use an environment-loading mechanism appropriate to your shell or deployment because no `@nestjs/config` or dotenv loader is configured in the application modules.
+
+### Database and infrastructure setup
+
+Start the local dependencies:
+
+```bash
+docker compose up -d
+```
+
+Generate and apply Drizzle migrations after the database is available:
+
+```bash
+pnpm exec drizzle-kit generate
+pnpm exec drizzle-kit migrate
+```
+
+No seed command or migration files are currently committed. The commands above use the schemas in `libs/database/src/schema` and write generated migrations to `drizzle/migrations`.
+
+### Running the applications
+
+Start each application in a separate terminal. The gateway depends on the Auth, Events, and Tickets HTTP services being available.
+
+```bash
+pnpm exec nest start auth --watch
+pnpm exec nest start events --watch
+pnpm exec nest start tickets --watch
+pnpm exec nest start notifications --watch
+pnpm run start:dev
+```
+
+The final command starts the default API Gateway application on port `3000`. The services listen on ports `3001` (Auth), `3003` (Events), `3004` (Tickets), and `3006` (Notifications). Kafka UI is available on port `8080`, and MailHog's web UI is available on port `8025`.
+
+## 7. Environment Variables
+
+| Variable Name | Description | Required (Y/N) | Example Value |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL URL used by `drizzle.config.ts` for Drizzle Kit commands. The runtime `DatabaseService` currently uses a hard-coded local URL instead. | Y for Drizzle migration commands | `postgresql://nexivent:nexivent_password@localhost:5432/nexivent?schema=public` |
+| `JWT_SECRET` | Secret used by the Auth service and API Gateway to sign and validate JWTs. Defaults to `secret` when unset. | N | `change-me-in-production` |
+| `KAFKA_BROKER` | Kafka broker address used by the shared Kafka module and Notifications consumer. Defaults to `localhost:9093`. | N | `localhost:9093` |
+| `SMTP_HOST` | SMTP host used by the Notifications email service. Defaults to `localhost`. | N | `localhost` |
+| `SMTP_PORT` | SMTP port used by the Notifications email service. Defaults to `1025`. | N | `1025` |
+| `TICKETS_SERVICE_URL` | Optional base URL used by the API Gateway when forwarding ticket requests. Defaults to `http://localhost:3004`. | N | `http://localhost:3004` |
+
+## 8. Testing
+
+The repository includes Jest unit tests for the Auth service and shared libraries, plus Nest/Supertest E2E test configuration and specs for each application. The root Jest configuration searches `apps/` and `libs/` for `*.spec.ts` files. No separate integration-test command is defined.
+
+```bash
+# Run unit tests and any discovered specs
+pnpm test
+
+# Watch tests
+pnpm run test:watch
+
+# Generate coverage in coverage/
+pnpm run test:cov
+
+# Run the API Gateway E2E suite
+pnpm run test:e2e
+
+# Format TypeScript source files
+pnpm run format
+
+# Run ESLint (the configured script applies --fix)
+pnpm run lint
+```
+
+## 9. Deployment & CI/CD
+
+Docker Compose is provided only for local infrastructure dependencies; there is no application Dockerfile, Kubernetes configuration, cloud deployment configuration, or CI/CD pipeline in this repository. Deployment and CI/CD are **not yet configured**.
